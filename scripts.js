@@ -1,29 +1,95 @@
+// Import necessary data
 import { books, authors, genres, BOOKS_PER_PAGE } from './data.js';
+
+// Define a Web Component for the book preview
+class BookPreview extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+    }
+
+    static get observedAttributes() {
+        return ['data-id', 'data-image', 'data-title', 'data-author'];
+    }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+        if (name === 'data-id') this.id = newValue;
+        if (name === 'data-image') this.image = newValue;
+        if (name === 'data-title') this.title = newValue;
+        if (name === 'data-author') this.author = newValue;
+        this.render();
+    }
+
+    connectedCallback() {
+        this.render();
+        this.shadowRoot.querySelector('button').addEventListener('click', () => {
+            this.dispatchEvent(new CustomEvent('preview-click', {
+                detail: { id: this.id },
+                bubbles: true,
+                composed: true
+            }));
+        });
+    }
+
+    render() {
+        this.shadowRoot.innerHTML = `
+            <style>
+                .preview {
+                    display: flex;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    overflow: hidden;
+                    cursor: pointer;
+                    transition: transform 0.2s;
+                }
+                .preview:hover {
+                    transform: scale(1.05);
+                }
+                .preview__image {
+                    width: 100px;
+                    height: 150px;
+                    object-fit: cover;
+                }
+                .preview__info {
+                    padding: 10px;
+                }
+                .preview__title {
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                .preview__author {
+                    font-size: 14px;
+                    color: #666;
+                }
+            </style>
+            <button class="preview">
+                <img class="preview__image" src="${this.image}" />
+                <div class="preview__info">
+                    <h3 class="preview__title">${this.title}</h3>
+                    <div class="preview__author">${authors[this.author]}</div>
+                </div>
+            </button>
+        `;
+    }
+}
+
+// Register the BookPreview Web Component
+customElements.define('book-preview', BookPreview);
 
 // State management
 let page = 1;
 let matches = books;
 
-// Utility function to create for the book preview 
-function createBookPreview({ author, id, image, title }) {
-    const element = document.createElement('button');
-    element.classList.add('preview');
-    element.setAttribute('data-preview', id);
-    element.innerHTML = `
-        <img class="preview__image" src="${image}" />
-        <div class="preview__info">
-            <h3 class="preview__title">${title}</h3>
-            <div class="preview__author">${authors[author]}</div>
-        </div>
-    `;
-    return element;
-}
-
-// Function to give book previews
+// Function to render book previews
 function renderBookPreviews(booksToRender) {
     const fragment = document.createDocumentFragment();
     booksToRender.slice(0, BOOKS_PER_PAGE).forEach(book => {
-        fragment.appendChild(createBookPreview(book));
+        const preview = document.createElement('book-preview');
+        preview.setAttribute('data-id', book.id);
+        preview.setAttribute('data-image', book.image);
+        preview.setAttribute('data-title', book.title);
+        preview.setAttribute('data-author', book.author);
+        fragment.appendChild(preview);
     });
     document.querySelector('[data-list-items]').innerHTML = '';
     document.querySelector('[data-list-items]').appendChild(fragment);
@@ -135,24 +201,27 @@ document.querySelector('[data-search-form]').addEventListener('submit', (event) 
 document.querySelector('[data-list-button]').addEventListener('click', () => {
     const fragment = document.createDocumentFragment();
     matches.slice(page * BOOKS_PER_PAGE, (page + 1) * BOOKS_PER_PAGE).forEach(book => {
-        fragment.appendChild(createBookPreview(book));
+        const preview = document.createElement('book-preview');
+        preview.setAttribute('data-id', book.id);
+        preview.setAttribute('data-image', book.image);
+        preview.setAttribute('data-title', book.title);
+        preview.setAttribute('data-author', book.author);
+        fragment.appendChild(preview);
     });
     document.querySelector('[data-list-items]').appendChild(fragment);
     page += 1;
 });
 
-document.querySelector('[data-list-items]').addEventListener('click', (event) => {
-    const previewId = event.target.closest('[data-preview]')?.dataset?.preview;
-    if (previewId) {
-        const activeBook = books.find(book => book.id === previewId);
-        if (activeBook) {
-            document.querySelector('[data-list-active]').open = true;
-            document.querySelector('[data-list-blur]').src = activeBook.image;
-            document.querySelector('[data-list-image]').src = activeBook.image;
-            document.querySelector('[data-list-title]').innerText = activeBook.title;
-            document.querySelector('[data-list-subtitle]').innerText = `${authors[activeBook.author]} (${new Date(activeBook.published).getFullYear()})`;
-            document.querySelector('[data-list-description]').innerText = activeBook.description;
-        }
+document.querySelector('[data-list-items]').addEventListener('preview-click', (event) => {
+    const previewId = event.detail.id;
+    const activeBook = books.find(book => book.id === previewId);
+    if (activeBook) {
+        document.querySelector('[data-list-active]').open = true;
+        document.querySelector('[data-list-blur]').src = activeBook.image;
+        document.querySelector('[data-list-image]').src = activeBook.image;
+        document.querySelector('[data-list-title]').innerText = activeBook.title;
+        document.querySelector('[data-list-subtitle]').innerText = `${authors[activeBook.author]} (${new Date(activeBook.published).getFullYear()})`;
+        document.querySelector('[data-list-description]').innerText = activeBook.description;
     }
 });
 
